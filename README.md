@@ -1,7 +1,7 @@
 # Logging service for bookCRUD 
 
 ## Technologies
-- Audit Log service gRPC Server with Message Queue
+- Audit Log service with gRPC or Message Queue
 
 ## Before Run
 To run, you must specify environment variables, for example, in the .env file
