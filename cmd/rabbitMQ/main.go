@@ -2,20 +2,21 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
-	"time"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/qazaqpyn/crud-audit-log/internal/config"
 	"github.com/qazaqpyn/crud-audit-log/internal/repository"
 	"github.com/qazaqpyn/crud-audit-log/internal/repository/mongo"
-	rabbitmq "github.com/qazaqpyn/crud-audit-log/internal/server/rabbitMQ"
-	"github.com/qazaqpyn/crud-audit-log/internal/service"
-	audit "github.com/qazaqpyn/crud-audit-log/pkg/domain"
-	"google.golang.org/protobuf/proto"
+	server "github.com/qazaqpyn/crud-audit-log/internal/server/rabbitMQ"
+	service "github.com/qazaqpyn/crud-audit-log/internal/service/rabbitMQ"
 )
 
 func main() {
+	ctx := context.Background()
+
 	cfg, err := config.New()
 	if err != nil {
 		log.Fatal(err)
@@ -27,37 +28,30 @@ func main() {
 	}
 
 	auditRepo := repository.NewAudit(db)
-	auditService := service.NewAudit(auditRepo)
+	auditService := service.NewAuditService(auditRepo)
 
-	rabbit, err := rabbitmq.NewClient(cfg.Rabbit.URI)
-	if err != nil {
+	srv := server.NewClient(auditService)
+
+	if err = srv.Listening(cfg.Rabbit.URI); err != nil {
 		log.Fatal(err)
 	}
 
-	msgs, err := rabbit.StartListening()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println("SERVER STARTED", time.Now())
-
-	forever := make(chan bool)
+	defer func(srv *server.Client) {
+		if err := srv.Close(); err != nil {
+			log.Fatal(err)
+		}
+	}(srv)
 
 	go func() {
-		for d := range msgs {
-			ans := &audit.LogRequest{}
-
-			err := proto.Unmarshal(d.Body, ans)
-			if err != nil {
-				log.Fatal(err)
-			}
-			err = auditService.Insert(context.Background(), ans)
-			if err != nil {
-				log.Fatal(err)
-			}
+		if err := srv.Serve(ctx); err != nil {
+			log.Fatal(err)
 		}
 	}()
 
-	log.Printf(" [*] Waiting for messages. To exit press CTRL+C")
-	<-forever
+	log.Println("server started")
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
+	<-quit
+
+	log.Println("server stopped")
 }

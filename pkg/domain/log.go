@@ -34,10 +34,10 @@ var (
 )
 
 type LogItem struct {
-	Entity    string    `bson:"entity"`
-	Action    string    `bson:"action"`
-	EntityID  string    `bson:"entity_id"`
-	Timestamp time.Time `bson:"timestamp"`
+	Entity    string    `bson:"entity" json:"entity"`
+	Action    string    `bson:"action" json:"action"`
+	EntityID  string    `bson:"entity_id" json:"entity_id"`
+	Timestamp time.Time `bson:"timestamp" json:"timestamp"`
 }
 
 func ToPbEntity(entity string) (LogRequest_Entities, error) {

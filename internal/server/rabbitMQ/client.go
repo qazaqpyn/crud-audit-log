@@ -1,27 +1,29 @@
 package rabbitmq
 
-import "github.com/streadway/amqp"
+import (
+	"context"
 
-type Client struct {
-	conn *amqp.Connection
-	ch   *amqp.Channel
+	"github.com/streadway/amqp"
+)
+
+type AuditService interface {
+	Insert(ctx context.Context, msg []byte) error
 }
 
-func NewClient(uri string) (*Client, error) {
-	conn, err := amqp.Dial(uri)
-	if err != nil {
-		return nil, err
-	}
+type Client struct {
+	conn    *amqp.Connection
+	ch      *amqp.Channel
+	msgs    <-chan amqp.Delivery
+	service AuditService
+}
 
-	ch, err := conn.Channel()
-	if err != nil {
-		return nil, err
-	}
-
+func NewClient(service AuditService) *Client {
 	return &Client{
-		conn: conn,
-		ch:   ch,
-	}, nil
+		conn:    new(amqp.Connection),
+		ch:      new(amqp.Channel),
+		msgs:    make(<-chan amqp.Delivery),
+		service: service,
+	}
 }
 
 func (s *Client) closeConnection() error {
@@ -32,7 +34,7 @@ func (s *Client) closeChannel() error {
 	return s.ch.Close()
 }
 
-func (s *Client) CloseServer() error {
+func (s *Client) Close() error {
 	err := s.closeChannel()
 	if err != nil {
 		return err
@@ -42,7 +44,21 @@ func (s *Client) CloseServer() error {
 	return err
 }
 
-func (s *Client) StartListening() (<-chan amqp.Delivery, error) {
+func (s *Client) Listening(uri string) error {
+	conn, err := amqp.Dial(uri)
+	if err != nil {
+		return err
+	}
+
+	s.conn = conn
+
+	ch, err := conn.Channel()
+	if err != nil {
+		return err
+	}
+
+	s.ch = ch
+
 	q, err := s.ch.QueueDeclare(
 		"messageQueue", // name
 		false,          // durable
@@ -52,10 +68,10 @@ func (s *Client) StartListening() (<-chan amqp.Delivery, error) {
 		nil,            // arguments
 	)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	msgs, err := s.ch.Consume(
+	s.msgs, err = s.ch.Consume(
 		q.Name, //queue
 		"",     //consumer
 		true,   // auto-ack
@@ -65,8 +81,17 @@ func (s *Client) StartListening() (<-chan amqp.Delivery, error) {
 		nil,    // args
 	)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return msgs, nil
+	return nil
+}
+
+func (s *Client) Serve(ctx context.Context) error {
+	for d := range s.msgs {
+		if err := s.service.Insert(context.Background(), d.Body); err != nil {
+			return err
+		}
+	}
+	return nil
 }

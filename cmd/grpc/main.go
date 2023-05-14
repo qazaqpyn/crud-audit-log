@@ -8,8 +8,8 @@ import (
 	"github.com/qazaqpyn/crud-audit-log/internal/config"
 	"github.com/qazaqpyn/crud-audit-log/internal/repository"
 	"github.com/qazaqpyn/crud-audit-log/internal/repository/mongo"
-	"github.com/qazaqpyn/crud-audit-log/internal/server"
-	"github.com/qazaqpyn/crud-audit-log/internal/service"
+	server "github.com/qazaqpyn/crud-audit-log/internal/server/grpc"
+	service "github.com/qazaqpyn/crud-audit-log/internal/service/grpc"
 )
 
 func main() {
