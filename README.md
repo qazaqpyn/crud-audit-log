@@ -1,5 +1,8 @@
 # Logging service for bookCRUD 
 
+## Technologies
+- Audit Log service gRPC Server
+
 ## Before Run
 To run, you must specify environment variables, for example, in the .env file
 ```
