@@ -11,11 +11,16 @@ import (
 type Config struct {
 	DB     Mongo
 	Server Server
+	Rabbit Rabbit
 }
 
 type Mongo struct {
 	URI      string
 	Database string
+}
+
+type Rabbit struct {
+	URI string
 }
 
 type Server struct {
@@ -32,6 +37,10 @@ func New() (*Config, error) {
 	uri := os.Getenv("DB_URI")
 	if uri == "" {
 		return nil, errors.New("You must set your 'MONGODB_URI' environmental variable\n")
+	}
+
+	if err := envconfig.Process("rabbit", &cfg.Rabbit); err != nil {
+		return nil, err
 	}
 
 	if err := envconfig.Process("db", &cfg.DB); err != nil {
